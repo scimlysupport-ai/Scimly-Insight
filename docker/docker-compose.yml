@@ -1,0 +1,30 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: scimly_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: scimly_user
+      POSTGRES_PASSWORD: scimly_pass
+      POSTGRES_DB: scimly_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - scimly_pg_data:/var/lib/postgresql/data
+
+  # Phase 13 — broker + result backend for the Celery worker that analyzes
+  # large uploads in the background.
+  redis:
+    image: redis:7-alpine
+    container_name: scimly_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - scimly_redis_data:/data
+
+volumes:
+  scimly_pg_data:
+  scimly_redis_data:

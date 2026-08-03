@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+venv/
+venv311/
+backend/venv/
+backend/venv311/
+.pytest_cache/
+
+# Node
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Uploads and local data
+uploads/
+*.csv
+*.xlsx
+
+# OS/editor
+.DS_Store
+.vscode/
