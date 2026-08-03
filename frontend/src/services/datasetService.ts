@@ -37,6 +37,15 @@ export interface RecommendationsResponse {
   recommendedCharts: ChartRecommendation[];
 }
 
+export interface AIInsight {
+  title: string;
+  text: string;
+}
+
+export interface AIInsightsResponse {
+  insights: AIInsight[];
+}
+
 // Phase 9 — Global Filters
 export interface DashboardFilters {
   categorical: Record<string, string[]>;
@@ -158,6 +167,11 @@ export async function fetchRecommendations(
   const { data } = await apiClient.get<RecommendationsResponse>(
     `/dataset/${fileId}/recommendations`
   );
+  return data;
+}
+
+export async function fetchAIInsights(fileId: number): Promise<AIInsightsResponse> {
+  const { data } = await apiClient.get<AIInsightsResponse>(`/dataset/${fileId}/insights`);
   return data;
 }
 

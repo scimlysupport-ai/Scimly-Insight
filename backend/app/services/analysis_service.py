@@ -8,6 +8,8 @@ the shape and quality of the data. Phase 4 builds chart recommendations
 on top of what this module returns.
 """
 import math
+from typing import Any
+
 import pandas as pd
 
 
@@ -298,3 +300,91 @@ def analyze_dataframe(df: pd.DataFrame) -> dict:
         "schema": _sanitize_for_json(schema),
         "skipped_rows": int(df.attrs.get("skipped_rows", 0)),
     }
+
+
+def _find_column(df: pd.DataFrame, *candidates: str) -> str | None:
+    """Return the first column name that matches a likely business-field alias."""
+    normalized = {str(col).strip().lower(): col for col in df.columns}
+    for candidate in candidates:
+        if candidate.lower() in normalized:
+            return normalized[candidate.lower()]
+
+    for col in df.columns:
+        name = str(col).strip().lower()
+        for candidate in candidates:
+            candidate_key = candidate.lower()
+            if candidate_key in name or name in candidate_key:
+                return col
+    return None
+
+
+def generate_ai_insights(df: pd.DataFrame) -> list[dict[str, Any]]:
+    """Generate text-only business insights for an uploaded dataset."""
+    if df.empty:
+        return [{"title": "No insights available", "text": "The uploaded data is empty, so there is nothing to summarize yet."}]
+
+    insights: list[dict[str, Any]] = []
+
+    revenue_col = _find_column(df, "revenue", "sales", "amount", "total", "income")
+    date_col = _find_column(df, "date", "datetime", "order_date", "sale_date", "transaction_date")
+    customer_col = _find_column(df, "customer", "customer_name", "client", "buyer", "name")
+    product_col = _find_column(df, "product", "product_name", "item", "sku")
+
+    if revenue_col and date_col:
+        work = df[[date_col, revenue_col]].copy()
+        work[date_col] = pd.to_datetime(work[date_col], errors="coerce", format="mixed")
+        work[revenue_col] = pd.to_numeric(work[revenue_col], errors="coerce")
+        work = work.dropna(subset=[date_col, revenue_col]).sort_values(date_col)
+
+        if not work.empty:
+            monthly = work.groupby(work[date_col].dt.to_period("M"))[revenue_col].sum()
+            if len(monthly) >= 2:
+                first_value = float(monthly.iloc[0])
+                last_value = float(monthly.iloc[-1])
+                if first_value:
+                    pct_change = round(((last_value - first_value) / first_value) * 100, 1)
+                    direction = "increased" if last_value >= first_value else "decreased"
+                    insights.append({
+                        "title": "Revenue growth",
+                        "text": f"Revenue {direction} {abs(pct_change)}% from the first month to the latest month, ending at {last_value:,.0f}.",
+                    })
+
+            if not monthly.empty:
+                highest_month = monthly.idxmax()
+                highest_value = float(monthly.max())
+                insights.append({
+                    "title": "Highest sales",
+                    "text": f"Highest sales landed in {highest_month} with {highest_value:,.0f} in revenue.",
+                })
+
+                lowest_month = monthly.idxmin()
+                lowest_value = float(monthly.min())
+                insights.append({
+                    "title": "Worst month",
+                    "text": f"The weakest month was {lowest_month} with {lowest_value:,.0f} in revenue.",
+                })
+
+    if revenue_col and customer_col:
+        customer_totals = df.groupby(customer_col)[revenue_col].sum().dropna()
+        if not customer_totals.empty:
+            top_customer = customer_totals.idxmax()
+            top_value = float(customer_totals.max())
+            insights.append({
+                "title": "Top customers",
+                "text": f"{top_customer} generated the most revenue, contributing {top_value:,.0f}.",
+            })
+
+    if revenue_col and product_col:
+        product_totals = df.groupby(product_col)[revenue_col].sum().dropna()
+        if not product_totals.empty:
+            best_product = product_totals.idxmax()
+            best_value = float(product_totals.max())
+            insights.append({
+                "title": "Best products",
+                "text": f"{best_product} was the strongest product line with {best_value:,.0f} in revenue.",
+            })
+
+    if not insights:
+        return [{"title": "No insights available", "text": "The uploaded data does not contain enough structure to generate business insights yet."}]
+
+    return insights[:5]

@@ -8,6 +8,7 @@ import {
   fetchRecentUploads,
   fetchDataset,
   fetchRecommendations,
+  fetchAIInsights,
   fetchProcessingProgress,
   deleteUpload,
 } from "../services/datasetService";
@@ -52,6 +53,12 @@ export default function Upload() {
   const { data: recommendations } = useQuery({
     queryKey: ["recommendations", activeFileId],
     queryFn: () => fetchRecommendations(activeFileId!),
+    enabled: !!dataset,
+  });
+
+  const { data: aiInsights } = useQuery({
+    queryKey: ["ai-insights", activeFileId],
+    queryFn: () => fetchAIInsights(activeFileId!),
     enabled: !!dataset,
   });
 
@@ -149,6 +156,7 @@ export default function Upload() {
       await deleteUpload(fileId);
       queryClient.removeQueries({ queryKey: ["dataset", fileId] });
       queryClient.removeQueries({ queryKey: ["recommendations", fileId] });
+      queryClient.removeQueries({ queryKey: ["ai-insights", fileId] });
       queryClient.invalidateQueries({ queryKey: ["uploads"] });
       if (activeFileId === fileId) {
         setActiveFileId(null);
@@ -230,6 +238,20 @@ export default function Upload() {
               <div key={col.name} className="flex justify-between border-b border-scimly-border/50 py-1">
                 <span>{col.name}</span>
                 <span className="text-scimly-accent">{col.dtype}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {aiInsights && aiInsights.insights.length > 0 && (
+        <div className="mt-4 bg-scimly-surface border border-scimly-border rounded-xl p-5">
+          <h2 className="font-medium mb-3">AI insights</h2>
+          <div className="space-y-3 text-sm">
+            {aiInsights.insights.map((insight, index) => (
+              <div key={`${insight.title}-${index}`} className="border-b border-scimly-border/50 pb-3 last:border-b-0 last:pb-0">
+                <p className="font-medium text-scimly-text">{insight.title}</p>
+                <p className="text-scimly-muted mt-1">{insight.text}</p>
               </div>
             ))}
           </div>

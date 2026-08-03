@@ -20,6 +20,15 @@ class ProcessingProgressResponse(BaseModel):
     message: Optional[str] = None
 
 
+class AIInsight(BaseModel):
+    title: str
+    text: str
+
+
+class AIInsightsResponse(BaseModel):
+    insights: list[AIInsight]
+
+
 class DatasetResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 

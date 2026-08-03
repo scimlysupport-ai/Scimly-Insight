@@ -11,9 +11,9 @@ from sqlalchemy.orm import Session
 from app.database.session import get_db
 from app.models.file import UploadedFile
 from app.models.dataset import Dataset
-from app.schemas.dataset import DatasetResponse, ProcessingProgressResponse
+from app.schemas.dataset import AIInsightsResponse, DatasetResponse, ProcessingProgressResponse
 from app.services.file_service import UPLOAD_DIR
-from app.services.analysis_service import read_dataframe, analyze_dataframe, clean_dataframe
+from app.services.analysis_service import read_dataframe, analyze_dataframe, clean_dataframe, generate_ai_insights
 from app.services.recommendation_service import recommend_charts
 from app.services.chart_data_service import build_all_chart_data, build_custom_chart
 from app.services.filter_service import get_filter_options, apply_filters
@@ -105,6 +105,34 @@ def get_dataset(file_id: int, db: Session = Depends(get_db)):
     db.refresh(dataset)
 
     return DatasetResponse.from_dataset(dataset)
+
+
+@router.get("/dataset/{file_id}/insights", response_model=AIInsightsResponse)
+def get_ai_insights(file_id: int, db: Session = Depends(get_db)):
+    """Return text-only AI insights for the uploaded dataset."""
+    file_record = db.query(UploadedFile).filter(UploadedFile.id == file_id).first()
+    if not file_record:
+        raise HTTPException(status_code=404, detail="File not found.")
+
+    dataset = db.query(Dataset).filter(Dataset.file_id == file_id).first()
+    if not dataset:
+        raise HTTPException(
+            status_code=404,
+            detail="Dataset not analyzed yet. Call GET /dataset/{file_id} first.",
+        )
+
+    full_path = os.path.join(UPLOAD_DIR, file_record.stored_filename)
+    if not os.path.exists(full_path):
+        raise HTTPException(status_code=404, detail="Stored file is missing on disk.")
+
+    try:
+        df = read_dataframe(full_path, file_record.file_extension)
+        df = clean_dataframe(df, schema=dataset.schema_json)
+        insights = generate_ai_insights(df)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Could not generate insights: {exc}")
+
+    return {"insights": insights}
 
 
 @router.get("/dataset/{file_id}/recommendations")
