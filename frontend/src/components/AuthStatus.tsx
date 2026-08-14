@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuthStore } from "../store/useAuthStore";
 
@@ -6,6 +7,7 @@ import { useAuthStore } from "../store/useAuthStore";
 // signed in, or the account name + a link to /account when they are.
 export default function AuthStatus() {
   const user = useAuthStore((s) => s.user);
+  const [imgError, setImgError] = useState(false);
 
   if (!user) {
     return (
@@ -15,14 +17,21 @@ export default function AuthStatus() {
     );
   }
 
+  const showAvatar = user.avatar_url && !imgError;
+
   return (
     <Link
       to="/account"
       className="flex items-center gap-2 text-sm text-scimly-muted hover:text-scimly-text"
       title="Account"
     >
-      {user.avatar_url ? (
-        <img src={user.avatar_url} alt="" className="w-6 h-6 rounded-full" />
+      {showAvatar ? (
+        <img
+          src={user.avatar_url!}
+          alt=""
+          className="w-6 h-6 rounded-full"
+          onError={() => setImgError(true)}
+        />
       ) : (
         <span className="w-6 h-6 rounded-full bg-scimly-primary/20 text-scimly-primary flex items-center justify-center text-xs font-medium">
           {(user.name || user.email || "?").charAt(0).toUpperCase()}

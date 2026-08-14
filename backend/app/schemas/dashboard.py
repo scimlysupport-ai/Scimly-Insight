@@ -13,13 +13,25 @@ class SavedWidget(BaseModel):
     (chart type, column/axis choices, color, title) already baked in.
     No separate "override" concept here; a saved widget just *is* its
     current state."""
-    chart: str  # "kpi" | "line" | "pie" | "bar" | "table"
+    chart: str  # "kpi" | "line" | "pie" | "bar" | "table" | "scatter"
     title: str
     column: Optional[str] = None
     x: Optional[str] = None
     y: Optional[str] = None
     columns: Optional[list[str]] = None
     color: Optional[str] = None
+    important: Optional[bool] = None
+    # Curated dashboard fields (Phase 4 follow-up) — optional so widgets
+    # saved before this change still load fine with these unset.
+    agg: Optional[str] = None  # "sum" | "count", for line/bar/pie with no explicit y
+    entity_column: Optional[str] = None  # "Top N" table's ranked column (e.g. customer)
+    measure: Optional[str] = None  # the numeric column an entity table ranks by
+    top_n: Optional[int] = None
+    sort_by: Optional[str] = None  # column the leftover-columns table sorts by (e.g. date)
+    granularity: Optional[str] = None  # "day" | "month", for line charts
+    rate_column: Optional[str] = None  # binary flag column for rate charts (e.g. attrition)
+    rate_value: Optional[str] = None  # which of the two values counts as "the rate"
+    count_kpi: Optional[bool] = None  # plain row-count KPI (Total Orders, Total Employees, ...)
 
 
 class LayoutItem(BaseModel):

@@ -14,6 +14,7 @@ from app.models.dataset import Dataset
 from app.schemas.dataset import AIInsightsResponse, DatasetResponse, ProcessingProgressResponse
 from app.services.file_service import UPLOAD_DIR
 from app.services.analysis_service import read_dataframe, analyze_dataframe, clean_dataframe, generate_ai_insights
+from app.services.ai_chat_service import build_ai_chat_widget
 from app.services.recommendation_service import recommend_charts
 from app.services.chart_data_service import build_all_chart_data, build_custom_chart
 from app.services.filter_service import get_filter_options, apply_filters
@@ -135,6 +136,32 @@ def get_ai_insights(file_id: int, db: Session = Depends(get_db)):
     return {"insights": insights}
 
 
+@router.post("/dataset/{file_id}/ai-chat")
+def ai_chat(file_id: int, payload: dict, db: Session = Depends(get_db)):
+    """Turn a prompt like 'Show monthly revenue' into a chart widget payload."""
+    file_record = db.query(UploadedFile).filter(UploadedFile.id == file_id).first()
+    if not file_record:
+        raise HTTPException(status_code=404, detail="File not found.")
+
+    dataset = db.query(Dataset).filter(Dataset.file_id == file_id).first()
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Dataset not analyzed yet. Call GET /dataset/{file_id} first.")
+
+    full_path = os.path.join(UPLOAD_DIR, file_record.stored_filename)
+    if not os.path.exists(full_path):
+        raise HTTPException(status_code=404, detail="Stored file is missing on disk.")
+
+    try:
+        df = read_dataframe(full_path, file_record.file_extension)
+        df = clean_dataframe(df, schema=dataset.schema_json)
+        prompt = payload.get("prompt", "")
+        widget = build_ai_chat_widget(df, prompt, schema=dataset.schema_json)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Could not generate chart: {exc}")
+
+    return {"widget": widget}
+
+
 @router.get("/dataset/{file_id}/recommendations")
 def get_recommendations(file_id: int, db: Session = Depends(get_db)):
     """
@@ -186,11 +213,18 @@ def get_filters(file_id: int, db: Session = Depends(get_db)):
 @router.post("/dataset/{file_id}/dashboard")
 def get_dashboard(file_id: int, filters: DashboardFilters, db: Session = Depends(get_db)):
     """
-    Returns { widgets: [...] } — each recommended chart plus the actual
-    data needed to render it, narrowed to rows matching `filters` (Phase 9).
-    Which charts appear is still decided from the full, unfiltered schema
-    (filtering rows shouldn't make widgets appear/disappear) — only the
-    data inside each one changes.
+    Returns { widgets: [...], moreWidgets: [...] } — each recommended
+    chart plus the actual data needed to render it, narrowed to rows
+    matching `filters` (Phase 9). Which charts appear is still decided
+    from the full, unfiltered schema (filtering rows shouldn't make
+    widgets appear/disappear) — only the data inside each one changes.
+
+    `widgets` is the curated set the recommendation engine marked
+    `important` — what the dashboard renders immediately, capped at a
+    handful of the most business-relevant charts instead of one per
+    column. `moreWidgets` is everything else, data already computed, so
+    the frontend can offer "+ Add chart" and drop one in instantly with
+    no extra request.
     """
     file_record = db.query(UploadedFile).filter(UploadedFile.id == file_id).first()
     if not file_record:
@@ -212,11 +246,13 @@ def get_dashboard(file_id: int, filters: DashboardFilters, db: Session = Depends
         df = clean_dataframe(df, schema=dataset.schema_json)
         df = apply_filters(df, filters.model_dump(), dataset.schema_json)
         recommended_charts = recommend_charts(dataset.schema_json)
-        widgets = build_all_chart_data(df, recommended_charts)
+        all_widgets = build_all_chart_data(df, recommended_charts)
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"Could not build dashboard: {exc}")
 
-    return {"widgets": widgets}
+    widgets = [w for w in all_widgets if w.get("important", True)]
+    more_widgets = [w for w in all_widgets if not w.get("important", True)]
+    return {"widgets": widgets, "moreWidgets": more_widgets}
 
 
 @router.post("/dataset/{file_id}/chart-preview", response_model=ChartPreviewResponse)

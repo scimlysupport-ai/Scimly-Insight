@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import html2canvas from "html2canvas";
+import { jsPDF } from "jspdf";
 import type { DashboardWidget } from "../services/datasetService";
 
 /**
@@ -162,3 +163,28 @@ export async function exportElementAsPNG(element: HTMLElement, filenamePrefix: s
     }, "image/png");
   });
 }
+
+/** Screenshots a DOM node and saves it as a PDF matching the dashboard aspect ratio. */
+export async function exportElementAsPDF(element: HTMLElement, filenamePrefix: string) {
+  const canvas = await html2canvas(element, {
+    backgroundColor: "#0b0f19",
+    scale: Math.min(2, window.devicePixelRatio || 1.5),
+    useCORS: true,
+  });
+
+  const imgData = canvas.toDataURL("image/png");
+  const pdfWidth = 595.28; // Standard A4 Width
+  const canvasWidth = canvas.width;
+  const canvasHeight = canvas.height;
+  const pdfHeight = (canvasHeight * pdfWidth) / canvasWidth;
+
+  const doc = new jsPDF({
+    orientation: pdfWidth > pdfHeight ? "landscape" : "portrait",
+    unit: "pt",
+    format: [pdfWidth, pdfHeight],
+  });
+
+  doc.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+  doc.save(`${filenamePrefix}.pdf`);
+}
+

@@ -3,6 +3,7 @@ import KpiWidget from "./widgets/KpiWidget";
 import LineWidget from "./widgets/LineWidget";
 import PieWidget from "./widgets/PieWidget";
 import BarWidget from "./widgets/BarWidget";
+import ScatterWidget from "./widgets/ScatterWidget";
 import TableWidget from "./widgets/TableWidget";
 import type { DashboardWidget } from "../services/datasetService";
 
@@ -64,6 +65,16 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     mapProps: (widget, color) => ({
       title: widget.title,
       data: widget.data as { name: string; value: number }[],
+      accentColor: color,
+    }),
+    columnTypes: ["numeric"],
+  },
+  scatter: {
+    component: ScatterWidget,
+    isEmpty: (data) => !Array.isArray(data) || data.length === 0,
+    mapProps: (widget, color) => ({
+      title: widget.title,
+      data: widget.data as { x: number; y: number }[],
       accentColor: color,
     }),
     columnTypes: ["numeric"],

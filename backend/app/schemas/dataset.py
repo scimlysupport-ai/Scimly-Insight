@@ -45,7 +45,7 @@ class DatasetResponse(BaseModel):
         `schema_json` to the API field `columns_schema`."""
         return cls(
             id=dataset.id,
-            file_id=dataset.file_id,
+            file_id=dataset.file_id if getattr(dataset, "file_id", None) is not None else getattr(dataset, "datasource_id", None),
             rows=dataset.rows,
             columns=dataset.columns,
             columns_schema=dataset.schema_json,

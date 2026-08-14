@@ -5,10 +5,10 @@ from app.schemas.filters import DashboardFilters
 
 
 class ChartPreviewRequest(BaseModel):
-    chart: str  # "kpi" | "line" | "pie" | "bar" | "table"
+    chart: str  # "kpi" | "line" | "pie" | "bar" | "table" | "scatter"
     column: Optional[str] = None        # used by kpi, pie, bar
-    x: Optional[str] = None             # used by line
-    y: Optional[str] = None             # used by line
+    x: Optional[str] = None             # used by line/scatter
+    y: Optional[str] = None             # used by line/scatter
     columns: Optional[list[str]] = None  # used by table
     filters: Optional[DashboardFilters] = None  # active global filters (Phase 9)
 

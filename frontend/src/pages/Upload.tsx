@@ -168,6 +168,18 @@ export default function Upload() {
 
   return (
     <div className="min-h-screen px-6 py-12 max-w-3xl mx-auto">
+      <div className="mb-6">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-scimly-muted hover:text-scimly-primary transition-colors"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+          </svg>
+          Back to Home
+        </Link>
+      </div>
+
       <div className="flex items-center justify-between mb-1">
         <h1 className="font-display text-2xl font-semibold">Upload a dataset</h1>
         <AuthStatus />

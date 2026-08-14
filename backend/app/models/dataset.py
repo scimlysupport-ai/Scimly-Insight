@@ -11,7 +11,8 @@ class Dataset(Base):
     __tablename__ = "datasets"
 
     id = Column(Integer, primary_key=True, index=True)
-    file_id = Column(Integer, ForeignKey("uploaded_files.id"), nullable=False, unique=True)
+    file_id = Column(Integer, ForeignKey("uploaded_files.id"), nullable=True, unique=True)
+    datasource_id = Column(Integer, ForeignKey("data_sources.id"), nullable=True, unique=True)
     rows = Column(Integer, nullable=False)
     columns = Column(Integer, nullable=False)
     schema_json = Column(JSON, nullable=False)  # list of {name, dtype, stats}

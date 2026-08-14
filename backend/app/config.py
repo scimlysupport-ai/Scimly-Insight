@@ -3,10 +3,12 @@ Central place for all app configuration.
 Reads values from the .env file so we never hardcode secrets in code.
 """
 from pydantic_settings import BaseSettings
+from pydantic import model_validator
+
 
 
 class Settings(BaseSettings):
-    DATABASE_URL: str = "postgresql://scimly_user:scimly_pass@localhost:5432/scimly_db"
+    DATABASE_URL: str = "sqlite:///./scimly.db"
     APP_ENV: str = "development"
     CORS_ORIGINS: str = "http://localhost:5173"
 
@@ -47,9 +49,18 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
 
+    @model_validator(mode="after")
+    def validate_database_url(self) -> "Settings":
+        if self.DATABASE_URL.startswith("postgres://"):
+            self.DATABASE_URL = self.DATABASE_URL.replace("postgres://", "postgresql://", 1)
+        if self.APP_ENV == "production" and self.DATABASE_URL.startswith("sqlite"):
+            raise ValueError("SQLite is not allowed in production. DATABASE_URL must point to PostgreSQL.")
+        return self
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
 
 
 settings = Settings()
+

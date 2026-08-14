@@ -5,3 +5,22 @@
 body {
   @apply bg-scimly-bg text-scimly-text font-body antialiased;
 }
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100% !important;
+  overflow: hidden !important; /* Force lock outer page scrolling */
+  background-color: #030712;
+}
+
+#root {
+  height: 100% !important;
+  overflow-y: auto !important; /* Force scrolling to happen strictly inside this container */
+  overflow-x: hidden !important;
+}
+
+body {
+  @apply bg-scimly-bg text-scimly-text font-body antialiased;
+}

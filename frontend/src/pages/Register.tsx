@@ -30,6 +30,18 @@ export default function Register() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6">
+      <div className="w-full max-w-sm mb-4">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-scimly-muted hover:text-scimly-primary transition-colors"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+          </svg>
+          Back to Home
+        </Link>
+      </div>
+
       <div className="w-full max-w-sm bg-scimly-surface border border-scimly-border rounded-xl p-6">
         <h1 className="font-display text-2xl font-semibold mb-1">Create an account</h1>
         <p className="text-scimly-muted text-sm mb-6">

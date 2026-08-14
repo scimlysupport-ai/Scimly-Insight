@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
 
 import {
   fetchDashboard,
@@ -10,6 +8,7 @@ import {
   fetchFilterOptions,
   fetchProcessingProgress,
   emptyFilters,
+  askScimly,
   type DashboardWidget,
   type DashboardFilters,
 } from "../services/datasetService";
@@ -32,13 +31,8 @@ import {
   exportWidgetsAsExcel,
   exportWidgetsAsJSON,
   exportElementAsPNG,
+  exportElementAsPDF,
 } from "../utils/exportUtils";
-
-function formatPdfValue(value: unknown): string {
-  if (value === null || value === undefined) return "—";
-  if (typeof value === "number") return value.toLocaleString();
-  return String(value);
-}
 
 interface InteractionState {
   widgetId: string;
@@ -74,6 +68,9 @@ export default function Dashboard() {
   const [resizeState, setResizeState] = useState<InteractionState | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [exportingFormat, setExportingFormat] = useState<string | null>(null);
+  const [chatPrompt, setChatPrompt] = useState("");
+  const [chatPending, setChatPending] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const layoutRef = useRef<LayoutItem[]>([]);
 
@@ -329,14 +326,39 @@ export default function Dashboard() {
   function computeEffectiveWidgets(): SavedWidget[] {
     return visibleWidgets.map(({ id: widgetId, widget }) => {
       const override = overrides?.[widgetId];
+      const isTypeChanged = override?.chart !== undefined && override.chart !== widget.chart;
+
+      if (isTypeChanged) {
+        return {
+          chart: override.chart,
+          title: override.title ?? widget.title,
+          column: override.column,
+          x: override.x,
+          y: override.y,
+          columns: override.columns,
+          color: override.color,
+        };
+      }
+
       return {
-        chart: override?.chart ?? widget.chart,
+        chart: widget.chart,
         title: override?.title ?? widget.title,
         column: override?.column ?? widget.column,
         x: override?.x ?? widget.x,
         y: override?.y ?? widget.y,
         columns: override?.columns ?? widget.columns,
-        color: override?.color,
+        color: override?.color ?? widget.color,
+
+        important: widget.important,
+        agg: override?.y === undefined ? (override?.column === undefined ? widget.agg : undefined) : undefined,
+        entity_column: widget.entity_column,
+        measure: widget.measure,
+        top_n: widget.top_n,
+        granularity: widget.granularity,
+        rate_column: widget.rate_column,
+        rate_value: widget.rate_value,
+        count_kpi: (override?.column !== undefined && override.column !== widget.column) ? false : widget.count_kpi,
+        sort_by: widget.sort_by,
       };
     });
   }
@@ -388,17 +410,38 @@ export default function Dashboard() {
     }
   }
 
+  async function handleAskScimly(event: ReactMouseEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    if (!fileId || !chatPrompt.trim()) return;
+    setChatPending(true);
+    setChatError(null);
+    try {
+      const response = await askScimly(Number(fileId), chatPrompt.trim());
+      setCustomWidgets((current) => [...current, response.widget]);
+      setChatPrompt("");
+    } catch (err: any) {
+      setChatError(err?.response?.data?.detail ?? "Could not generate a chart from that prompt.");
+    } finally {
+      setChatPending(false);
+    }
+  }
+
   function addWidget() {
     if (!dataset) return;
     const widgetId = `custom-widget-${customWidgets.length + 1}`;
-    const defaultColumn = dataset.columns_schema.find((c) => c.dtype === "numeric")?.name ?? dataset.columns_schema[0]?.name;
+    const numericColumns = dataset.columns_schema.filter((c) => c.dtype === "numeric").map((c) => c.name);
+    const defaultColumn = numericColumns[0] ?? dataset.columns_schema[0]?.name;
+    const defaultX = newWidgetType === "line"
+      ? dataset.columns_schema.find((c) => c.dtype === "datetime")?.name ?? numericColumns[0] ?? dataset.columns_schema[0]?.name
+      : numericColumns[0] ?? dataset.columns_schema[0]?.name;
+    const defaultY = numericColumns[0] ?? dataset.columns_schema[0]?.name;
     const defaultTableColumns = dataset.columns_schema.slice(0, 3).map((c) => c.name);
     const patch = {
       chart: newWidgetType,
       title: `${newWidgetType.toUpperCase()} widget`,
       column: newWidgetType === "table" ? undefined : defaultColumn,
-      x: undefined,
-      y: undefined,
+      x: newWidgetType === "line" ? defaultX : undefined,
+      y: newWidgetType === "line" ? defaultY : undefined,
       columns: newWidgetType === "table" ? defaultTableColumns : undefined,
       deleted: false,
     };
@@ -418,93 +461,6 @@ export default function Dashboard() {
     setNewWidgetType("kpi");
   }
 
-  function exportDashboard() {
-    const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
-    const margin = 40;
-    let y = 50;
-
-    doc.setFontSize(18);
-    doc.setTextColor(34, 34, 34);
-    doc.text(`Dashboard export for file ${fileKey}`, margin, y);
-    y += 22;
-
-    doc.setFontSize(10);
-    doc.setTextColor(102, 102, 102);
-    doc.text("Generated from the dashboard widgets and table data.", margin, y);
-    y += 24;
-
-    visibleWidgets.forEach(({ widget }, index) => {
-      if (y > 760) {
-        doc.addPage();
-        y = 50;
-      }
-
-      doc.setFontSize(12);
-      doc.setTextColor(0, 0, 0);
-      doc.text(`${index + 1}. ${widget.title ?? "Untitled widget"}`, margin, y);
-      y += 16;
-
-      if (widget.chart === "table") {
-        const tableData = (widget.data as { columns?: string[]; rows?: Record<string, unknown>[]; totalRows?: number } | undefined) ?? {};
-        const columns = tableData.columns ?? [];
-        const rowsData = tableData.rows ?? [];
-
-        if (columns.length === 0) {
-          doc.setFontSize(10);
-          doc.setTextColor(102, 102, 102);
-          doc.text("No table columns available.", margin, y);
-          y += 16;
-          return;
-        }
-
-        const tableRows = rowsData.map((row) => columns.map((column) => formatPdfValue(row?.[column])));
-        autoTable(doc, {
-          head: [columns],
-          body: tableRows,
-          startY: y,
-          styles: { fontSize: 8, cellPadding: 3 },
-          headStyles: { fillColor: [91, 141, 239], textColor: 255 },
-          margin: { left: margin, right: margin },
-          theme: "striped",
-          didDrawPage: () => {
-            y = (doc as typeof doc & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y;
-          },
-        });
-        y = (doc as typeof doc & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y;
-        y += 16;
-        return;
-      }
-
-      const summaryLines = [] as string[];
-      if (Array.isArray(widget.data)) {
-        widget.data.forEach((item: Record<string, unknown>) => {
-          const label = (item.name ?? item.x ?? item.label ?? "") as string;
-          const value = (item.value ?? item.y ?? "") as string | number;
-          summaryLines.push(`${label}: ${value}`);
-        });
-      } else if (widget.chart === "kpi") {
-        const kpiData = widget.data as { value?: number } | undefined;
-        summaryLines.push(`Value: ${kpiData?.value ?? "n/a"}`);
-      } else {
-        summaryLines.push(JSON.stringify(widget.data));
-      }
-
-      doc.setFontSize(10);
-      doc.setTextColor(68, 68, 68);
-      summaryLines.forEach((line) => {
-        if (y > 760) {
-          doc.addPage();
-          y = 50;
-        }
-        doc.text(line, margin + 10, y);
-        y += 12;
-      });
-      y += 6;
-    });
-
-    doc.save(`dashboard-export-${fileKey}.pdf`);
-  }
-
   // Phase 11 — Export. One entry point for all five formats, wired to
   // the ExportMenu dropdown. PDF/CSV/Excel/JSON export the widgets'
   // underlying data; PNG screenshots the rendered grid itself.
@@ -516,7 +472,8 @@ export default function Dashboard() {
       const widgets = visibleWidgets.map(({ widget }) => widget);
 
       if (format === "pdf") {
-        exportDashboard();
+        if (!gridRef.current) return;
+        await exportElementAsPDF(gridRef.current, filenamePrefix);
         return;
       }
       if (format === "csv") {
@@ -637,22 +594,38 @@ export default function Dashboard() {
               </button>
             </>
           )}
-          {isSavedMode && (
+          {isSavedMode ? (
+            <>
+              <button
+                onClick={handleSave}
+                disabled={updateMutation.isPending}
+                className="text-sm px-3 py-1.5 rounded-lg bg-scimly-primary text-scimly-bg hover:scale-[1.01] active:scale-[0.99] font-medium disabled:opacity-50"
+              >
+                {updateMutation.isPending ? "Saving…" : saveState === "saved" ? "Saved ✓" : "Save Changes"}
+              </button>
+              <button
+                onClick={handleSaveAs}
+                disabled={createMutation.isPending}
+                className="text-sm px-3 py-1.5 rounded-lg border border-scimly-border text-scimly-muted hover:text-scimly-text disabled:opacity-50"
+              >
+                {createMutation.isPending ? "Saving…" : "Save Copy as…"}
+              </button>
+              <Link
+                to={`/enterprise?tab=sharing&dashboardId=${savedDashboard?.id}`}
+                className="text-sm px-3 py-1.5 rounded-lg border border-scimly-border text-scimly-muted hover:text-scimly-text"
+              >
+                Share
+              </Link>
+            </>
+          ) : (
             <button
-              onClick={handleSave}
-              disabled={updateMutation.isPending}
-              className="text-sm px-3 py-1.5 rounded-lg border border-scimly-primary text-scimly-primary disabled:opacity-50"
+              onClick={handleSaveAs}
+              disabled={createMutation.isPending}
+              className="text-sm px-3.5 py-1.5 rounded-lg bg-scimly-primary text-scimly-bg hover:scale-[1.01] active:scale-[0.99] font-semibold disabled:opacity-50 shadow-lg shadow-scimly-primary/10"
             >
-              {updateMutation.isPending ? "Saving…" : saveState === "saved" ? "Saved ✓" : "Save"}
+              {createMutation.isPending ? "Saving…" : "Save Dashboard"}
             </button>
           )}
-          <button
-            onClick={handleSaveAs}
-            disabled={createMutation.isPending}
-            className="text-sm px-3 py-1.5 rounded-lg border border-scimly-border text-scimly-muted hover:text-scimly-text disabled:opacity-50"
-          >
-            {createMutation.isPending ? "Saving…" : "Save as…"}
-          </button>
           <ExportMenu onExport={handleExport} busy={exportingFormat} />
           <button
             onClick={toggleEditMode}
@@ -676,6 +649,57 @@ export default function Dashboard() {
 
       {filterOptions && (
         <FilterBar options={filterOptions} filters={filters} onChange={setFilters} />
+      )}
+
+      {dataset && (
+        <div className="mb-6 rounded-xl border border-scimly-border bg-scimly-surface/70 p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end">
+            <div className="flex-1">
+              <label className="text-sm font-medium text-scimly-text">Ask Scimly Insight</label>
+              <p className="text-xs text-scimly-muted mt-1">
+                Try prompts like “Show monthly revenue”, “Top customers”, or “Best products”.
+              </p>
+              <input
+                value={chatPrompt}
+                onChange={(event) => setChatPrompt(event.target.value)}
+                placeholder="Show monthly revenue"
+                className="mt-2 w-full rounded-lg border border-scimly-border bg-scimly-background px-3 py-2 text-sm text-scimly-text outline-none focus:border-scimly-primary"
+              />
+            </div>
+            <button
+              onClick={handleAskScimly}
+              disabled={chatPending || !chatPrompt.trim()}
+              className="rounded-lg border border-scimly-primary bg-scimly-primary px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {chatPending ? "Generating…" : "Generate chart"}
+            </button>
+          </div>
+          {chatError && (
+            <p className="mt-3 text-sm text-red-400">{chatError}</p>
+          )}
+        </div>
+      )}
+
+      {!isSavedMode && autoDashboard?.moreWidgets && autoDashboard.moreWidgets.length > 0 && (
+        <div className="mb-6 rounded-xl border border-scimly-border bg-scimly-surface/70 p-4">
+          <p className="text-sm font-medium text-scimly-text">
+            More charts available ({autoDashboard.moreWidgets.length})
+          </p>
+          <p className="text-xs text-scimly-muted mt-1 mb-3">
+            The dashboard opens with just the most important charts. Add any of these too.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {autoDashboard.moreWidgets.map((widget: DashboardWidget, i: number) => (
+              <button
+                key={`more-widget-${i}-${widget.title}`}
+                onClick={() => setCustomWidgets((current) => [...current, widget])}
+                className="text-sm px-3 py-1.5 rounded-lg border border-scimly-border text-scimly-text hover:border-scimly-primary hover:text-scimly-primary"
+              >
+                + {widget.title}
+              </button>
+            ))}
+          </div>
+        </div>
       )}
 
       {isLoading && <p className="text-scimly-muted">Building your dashboard…</p>}

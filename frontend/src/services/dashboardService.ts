@@ -16,6 +16,16 @@ export interface SavedWidget {
   y?: string;
   columns?: string[];
   color?: string;
+  important?: boolean;
+  agg?: string;
+  entity_column?: string;
+  measure?: string;
+  top_n?: number;
+  granularity?: string;
+  rate_column?: string;
+  rate_value?: string;
+  count_kpi?: boolean;
+  sort_by?: string;
 }
 
 export interface SavedDashboardResponse {

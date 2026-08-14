@@ -123,11 +123,22 @@ export interface DashboardWidget {
   y?: string;
   value?: number;
   columns?: string[];
+  important?: boolean;
+  agg?: string;
+  entity_column?: string;
+  measure?: string;
+  top_n?: number;
+  granularity?: string;
+  rate_column?: string;
+  rate_value?: string;
+  count_kpi?: boolean;
+  sort_by?: string;
   data: unknown;
 }
 
 export interface DashboardResponse {
   widgets: DashboardWidget[];
+  moreWidgets?: DashboardWidget[];
 }
 
 export async function fetchDataset(fileId: number): Promise<DatasetResponse> {
@@ -208,5 +219,14 @@ export async function fetchDashboard(
     `/dataset/${fileId}/dashboard`,
     filters
   );
+  return data;
+}
+
+export interface AIChatResponse {
+  widget: DashboardWidget;
+}
+
+export async function askScimly(fileId: number, prompt: string): Promise<AIChatResponse> {
+  const { data } = await apiClient.post<AIChatResponse>(`/dataset/${fileId}/ai-chat`, { prompt });
   return data;
 }

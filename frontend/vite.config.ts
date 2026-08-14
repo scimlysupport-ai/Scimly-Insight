@@ -18,7 +18,7 @@ export default defineConfig({
       // Any request the frontend makes to /api/* gets forwarded to FastAPI.
       // This avoids CORS headaches during local development.
       "/api": {
-        target: "http://localhost:8001",
+        target: "http://localhost:8000",
         changeOrigin: true,
       },
     },

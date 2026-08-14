@@ -158,6 +158,16 @@ def _detect_column_type(series: pd.Series) -> str:
     if pd.api.types.is_numeric_dtype(series):
         return "numeric"
 
+    # A column already stored as a real datetime64 dtype (Excel date
+    # cells come through this way, and so does any live database
+    # TIMESTAMP/DATE column via Phase 16) never reaches the string-based
+    # datetime-parsing check below, since it isn't string/object dtype —
+    # without this check it fell through to the categorical/text logic
+    # instead, silently breaking every line-chart recommendation for
+    # inputs that don't happen to store dates as plain strings.
+    if pd.api.types.is_datetime64_any_dtype(series):
+        return "datetime"
+
     # NOTE: don't gate the checks below on `series.dtype == object`. Some
     # pandas versions store text in a dedicated string dtype (not plain
     # `object`), so that check silently evaluates to False and skips both
@@ -318,7 +328,39 @@ def _find_column(df: pd.DataFrame, *candidates: str) -> str | None:
     return None
 
 
-def generate_ai_insights(df: pd.DataFrame) -> list[dict[str, Any]]:
+def _is_datetime_series(series: pd.Series) -> bool:
+    non_null = series.dropna()
+    if non_null.empty:
+        return False
+    parsed = pd.to_datetime(non_null, errors="coerce", format="mixed")
+    return parsed.notna().mean() > 0.8
+
+
+def _find_datetime_columns(df: pd.DataFrame) -> list[str]:
+    return [col for col in df.columns if _is_datetime_series(df[col])]
+
+
+def _find_categorical_columns(df: pd.DataFrame) -> list[str]:
+    categorical_cols: list[str] = []
+    for col in df.columns:
+        series = df[col]
+        if pd.api.types.is_bool_dtype(series) or pd.api.types.is_numeric_dtype(series):
+            continue
+        if _is_datetime_series(series):
+            continue
+        non_null = series.dropna().astype(str)
+        if non_null.empty:
+            continue
+        avg_length = non_null.str.len().mean()
+        if avg_length > 50:
+            continue
+        unique_ratio = non_null.nunique() / len(non_null)
+        if unique_ratio < 0.9 or len(non_null) <= 50:
+            categorical_cols.append(col)
+    return categorical_cols
+
+
+def generate_ai_insights(df: pd.DataFrame, schema: list[dict] | None = None) -> list[dict[str, Any]]:
     """Generate text-only business insights for an uploaded dataset."""
     if df.empty:
         return [{"title": "No insights available", "text": "The uploaded data is empty, so there is nothing to summarize yet."}]
@@ -385,6 +427,87 @@ def generate_ai_insights(df: pd.DataFrame) -> list[dict[str, Any]]:
             })
 
     if not insights:
-        return [{"title": "No insights available", "text": "The uploaded data does not contain enough structure to generate business insights yet."}]
+        insights.extend(_generic_insights(df, schema))
+        return insights[:5]
 
     return insights[:5]
+
+
+def _generic_insights(df: pd.DataFrame, schema: list[dict] | None) -> list[dict[str, Any]]:
+    """
+    Domain-agnostic insights for datasets that don't have a
+    revenue/customer/product shape (HR, banking, anything else) --
+    reuses the exact same column ranking the dashboard curation and Ask
+    Scimly use, so an HR upload gets "Average salary is $X" and
+    "Attrition rate is Y%" instead of being told its data isn't rich
+    enough.
+    """
+    from app.services.column_semantics import (
+        rank_measure_columns,
+        primary_date_column,
+        rank_dimension_columns,
+        rank_binary_flag_columns,
+        positive_flag_value,
+        preferred_agg,
+    )
+
+    if schema is None:
+        schema = analyze_dataframe(df)["schema"]
+
+    generic: list[dict[str, Any]] = []
+
+    for flag_col in rank_binary_flag_columns(schema)[:1]:
+        positive = positive_flag_value(flag_col)
+        if positive is None or flag_col["name"] not in df.columns:
+            continue
+        series = df[flag_col["name"]].dropna()
+        if series.empty:
+            continue
+        rate = 100.0 * (series == positive).sum() / len(series)
+        generic.append({
+            "title": f"{flag_col['name'].title()} rate",
+            "text": f"{rate:.1f}% of records have {flag_col['name']} = \"{positive}\".",
+        })
+
+    measures = rank_measure_columns(schema)
+    for measure in measures[:2]:
+        col_name = measure["name"]
+        if col_name not in df.columns:
+            continue
+        series = pd.to_numeric(df[col_name], errors="coerce").dropna()
+        if series.empty:
+            continue
+        if preferred_agg(col_name) == "avg":
+            generic.append({
+                "title": f"Average {col_name.title()}",
+                "text": f"The average {col_name} is {series.mean():,.1f}.",
+            })
+        else:
+            generic.append({
+                "title": f"Total {col_name.title()}",
+                "text": f"{col_name.title()} totals {series.sum():,.0f} across {len(series):,} records.",
+            })
+
+    dimensions = rank_dimension_columns(schema)
+    if dimensions and dimensions[0]["name"] in df.columns:
+        dim_name = dimensions[0]["name"]
+        counts = df[dim_name].value_counts()
+        if not counts.empty:
+            top_value = counts.index[0]
+            share = 100.0 * counts.iloc[0] / counts.sum()
+            generic.append({
+                "title": f"Most common {dim_name}",
+                "text": f"\"{top_value}\" is the most common {dim_name}, making up {share:.0f}% of records.",
+            })
+
+    date_col = primary_date_column(schema)
+    structure_bits = []
+    if date_col:
+        structure_bits.append(f"date range from {date_col['stats'].get('min')} to {date_col['stats'].get('max')}")
+    structure_bits.append(f"{len(df.columns)} columns")
+    generic.append({
+        "title": "Dataset structure",
+        "text": f"This dataset has {len(df):,} rows with {', '.join(structure_bits)}.",
+    })
+
+    return generic

@@ -47,11 +47,11 @@ export default function EditableWidget({ fileId, storageKey, widgetId, widget, s
   const effectiveTitle = override?.title ?? widget.title;
 
   const structuralChanged =
-    effectiveChart !== widget.chart ||
-    effectiveColumn !== widget.column ||
-    effectiveX !== widget.x ||
-    effectiveY !== widget.y ||
-    (override?.columns ?? widget.columns)?.join("|") !== (widget.columns ?? []).join("|");
+    (override?.chart !== undefined && override.chart !== widget.chart) ||
+    (override?.column !== undefined && override.column !== widget.column) ||
+    (override?.x !== undefined && override.x !== widget.x) ||
+    (override?.y !== undefined && override.y !== widget.y) ||
+    (override?.columns !== undefined && override.columns?.join("|") !== (widget.columns ?? []).join("|"));
 
   const previewRequest = {
     chart: effectiveChart,
@@ -151,8 +151,28 @@ export default function EditableWidget({ fileId, storageKey, widgetId, widget, s
               const newChart = e.target.value as DashboardWidget["chart"];
               if (newChart === "line") {
                 const dateCol = schema.find((c) => c.dtype === "datetime")?.name ?? schema[0]?.name;
-                const numCol = columnsOfType(schema, ["numeric"])[0]?.name;
-                patch({ chart: newChart, x: dateCol, y: numCol, column: undefined, columns: undefined });
+                const numericCols = columnsOfType(schema, ["numeric"]).map((c) => c.name);
+                patch({
+                  chart: newChart,
+                  x: dateCol,
+                  y: numericCols[1] ?? numericCols[0],
+                  column: undefined,
+                  columns: undefined,
+                });
+              } else if (newChart === "bar" || newChart === "pie") {
+                // Bar/pie now mean "a measure grouped by category"
+                // (Revenue by Region), matching the dashboard's own
+                // recommendation engine — not a single numeric
+                // column's own distribution.
+                const dimCol = columnsOfType(schema, ["categorical"])[0]?.name ?? schema[0]?.name;
+                const numericCols = columnsOfType(schema, ["numeric"]).map((c) => c.name);
+                patch({
+                  chart: newChart,
+                  x: dimCol,
+                  y: numericCols[0],
+                  column: undefined,
+                  columns: undefined,
+                });
               } else if (newChart === "table") {
                 const validCols = columnsOfType(schema, getWidgetDefinition(newChart)?.columnTypes ?? []);
                 patch({
@@ -182,24 +202,26 @@ export default function EditableWidget({ fileId, storageKey, widgetId, widget, s
             ))}
           </select>
 
-          {effectiveChart === "line" ? (
+          {effectiveChart === "line" || effectiveChart === "bar" || effectiveChart === "pie" ? (
             <>
               <select
                 value={effectiveX ?? ""}
                 onChange={(e) => patch({ x: e.target.value })}
                 className="no-drag bg-scimly-surface border border-scimly-border rounded px-1.5 py-1 text-scimly-text"
               >
-                <option value="" disabled>X axis</option>
-                {schema.map((c) => (
+                <option value="" disabled>{effectiveChart === "line" ? "X axis" : "Category"}</option>
+                {(effectiveChart === "line" ? schema : columnsOfType(schema, ["categorical"])).map((c) => (
                   <option key={c.name} value={c.name}>{c.name}</option>
                 ))}
               </select>
               <select
                 value={effectiveY ?? ""}
-                onChange={(e) => patch({ y: e.target.value })}
+                onChange={(e) => patch({ y: e.target.value || undefined })}
                 className="no-drag bg-scimly-surface border border-scimly-border rounded px-1.5 py-1 text-scimly-text"
               >
-                <option value="" disabled>Y axis</option>
+                <option value="" disabled={effectiveChart === "line"}>
+                  {effectiveChart === "line" ? "Y axis" : "Measure (none = count)"}
+                </option>
                 {numericOptions.map((c) => (
                   <option key={c.name} value={c.name}>{c.name}</option>
                 ))}

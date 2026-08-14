@@ -2,10 +2,13 @@ import axios from "axios";
 import { getDeviceId } from "./deviceId";
 import { useAuthStore } from "../store/useAuthStore";
 
+// Use environment variable in production, fallback to local dev proxy /api
+const isProduction = import.meta.env.PROD;
+const apiBase = import.meta.env.VITE_API_URL || (isProduction ? "" : "/api");
+
 // All backend calls go through this single client.
-// Base URL is empty because Vite's dev server proxies /api -> FastAPI (see vite.config.ts).
 export const apiClient = axios.create({
-  baseURL: "/api",
+  baseURL: apiBase,
 });
 
 // Phase 10 — every request carries this browser's anonymous device id,
@@ -14,6 +17,7 @@ export const apiClient = axios.create({
 // JWT; the backend's shared dependency (app/api/deps.py) prefers the
 // Bearer token and falls back to X-Device-Id, so sending both is safe.
 apiClient.interceptors.request.use((config) => {
+  config.headers = config.headers ?? {};
   config.headers["X-Device-Id"] = getDeviceId();
 
   const token = useAuthStore.getState().token;

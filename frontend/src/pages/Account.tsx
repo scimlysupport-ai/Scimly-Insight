@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
@@ -37,12 +38,32 @@ export default function Account() {
     );
   }
 
+  const [imgError, setImgError] = useState(false);
+  const showAvatar = user.avatar_url && !imgError;
+
   return (
     <div className="min-h-screen px-6 py-10 max-w-3xl mx-auto">
+      <div className="mb-6">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-scimly-muted hover:text-scimly-primary transition-colors"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+          </svg>
+          Back to Home
+        </Link>
+      </div>
+
       <div className="flex items-center justify-between mb-8 flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          {user.avatar_url ? (
-            <img src={user.avatar_url} alt="" className="w-12 h-12 rounded-full" />
+          {showAvatar ? (
+            <img
+              src={user.avatar_url!}
+              alt=""
+              className="w-12 h-12 rounded-full"
+              onError={() => setImgError(true)}
+            />
           ) : (
             <span className="w-12 h-12 rounded-full bg-scimly-primary/20 text-scimly-primary flex items-center justify-center text-lg font-medium">
               {(user.name || user.email || "?").charAt(0).toUpperCase()}

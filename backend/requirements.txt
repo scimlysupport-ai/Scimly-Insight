@@ -19,3 +19,9 @@ email-validator==2.2.0
 # Phase 13 — Large Dataset Support
 celery==5.4.0
 redis==5.0.8
+
+# Phase 16 — Live datasource connectors
+pymongo==4.6.0
+mysql-connector-python==8.1.0
+pymssql==2.2.7
+oracledb==1.3.0
