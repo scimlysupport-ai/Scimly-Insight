@@ -30,37 +30,32 @@ router = APIRouter()
 
 @router.get("/dataset/{file_id}/progress", response_model=ProcessingProgressResponse)
 def get_processing_progress(file_id: int, db: Session = Depends(get_db)):
-    """
-    Phase 13 — polled by the frontend while a large file's analysis runs
-    in the background. Redis (via progress_service) is the live source of
-    truth while a Celery worker is actively working through the pipeline;
-    the file's `status` column in Postgres is the fallback once that
-    Redis key has expired (or was never written, e.g. a small file that
-    was never queued in the first place).
-    """
-    file_record = db.query(UploadedFile).filter(UploadedFile.id == file_id).first()
-    if not file_record:
-        raise HTTPException(status_code=404, detail="File not found.")
-
     try:
-        live = get_progress(file_id)
-        if live is not None:
-            return ProcessingProgressResponse(**live)
-    except Exception:
-        pass
+        file_record = db.query(UploadedFile).filter(UploadedFile.id == file_id).first()
+        if not file_record:
+            raise HTTPException(status_code=404, detail="File not found.")
 
-    if file_record.status == "ready":
-        return ProcessingProgressResponse(status="ready", progress=100, message="Analysis complete.")
-    if file_record.status == "failed":
-        return ProcessingProgressResponse(status="failed", progress=0, message="Analysis failed.")
-    if file_record.status == "processing":
-        # Queued but the worker hasn't written a checkpoint yet (or its
-        # first Redis write expired before this poll landed).
-        return ProcessingProgressResponse(status="queued", progress=0, message="Waiting for a worker to pick this up…")
+        try:
+            live = get_progress(file_id)
+            if live is not None:
+                return ProcessingProgressResponse(**live)
+        except Exception:
+            pass
 
-    # "uploaded" — a small file that was never queued in the first place;
-    # its analysis happens synchronously on GET /dataset/{file_id}.
-    return ProcessingProgressResponse(status="uploaded", progress=0, message=None)
+        if file_record.status == "ready":
+            return ProcessingProgressResponse(status="ready", progress=100, message="Analysis complete.")
+        if file_record.status == "failed":
+            return ProcessingProgressResponse(status="failed", progress=0, message="Analysis failed.")
+        if file_record.status == "processing":
+            return ProcessingProgressResponse(status="queued", progress=0, message="Waiting for a worker to pick this up…")
+
+        return ProcessingProgressResponse(status="uploaded", progress=0, message=None)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).exception("Error in get_processing_progress for file %s", file_id)
+        raise HTTPException(status_code=500, detail=f"Progress error: {exc}")
 
 
 @router.get("/dataset/{file_id}", response_model=DatasetResponse)
