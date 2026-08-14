@@ -94,7 +94,7 @@ export default function Dashboard() {
   // while it's still an active stage. Saved dashboards are excluded:
   // a dashboard can't have been saved against a file that was never
   // successfully analyzed, so there's nothing to gate there.
-  const { data: processingStatus } = useQuery({
+  const { data: processingStatus, isError: isProgressError, error: progressErrorObj } = useQuery({
     queryKey: ["processing-progress", id],
     queryFn: () => fetchProcessingProgress(id),
     enabled: !Number.isNaN(id) && !isSavedMode,
@@ -111,6 +111,7 @@ export default function Dashboard() {
   // fetchDataset against a file whose Dataset row may not exist yet.
   const isProcessingBlocked =
     !isSavedMode &&
+    !isProgressError &&
     (!processingStatus || (processingStatus.status !== "ready" && processingStatus.status !== "uploaded"));
 
   const { data: filterOptions } = useQuery({
@@ -511,8 +512,23 @@ export default function Dashboard() {
   }
 
   // Phase 13 — a large file still being analyzed in the background has
-  // no dashboard/dataset to show yet. Bail out before the main render
-  // instead of threading a loading flag through every widget below.
+  if (isProgressError) {
+    return (
+      <div className="min-h-screen px-6 py-10 max-w-3xl mx-auto flex flex-col items-center justify-center text-center gap-4">
+        <h1 className="font-display text-2xl font-semibold text-red-400">
+          Unable to connect to backend server
+        </h1>
+        <p className="text-scimly-muted text-sm bg-scimly-surface border border-scimly-border rounded-lg px-4 py-3 max-w-md">
+          {(progressErrorObj as any)?.message || "Network error. Please verify the backend server is running and VITE_API_URL is configured."}
+        </p>
+        <Link to="/upload" className="text-scimly-primary text-sm hover:underline">
+          ← Back to Upload
+        </Link>
+      </div>
+    );
+  }
+
+  // Phase 13 — a file navigated to directly (bookmark, back button, a
   if (isProcessingBlocked) {
     const failed = processingStatus?.status === "failed";
     return (
