@@ -40,17 +40,24 @@ export async function fetchMe(): Promise<AuthUser> {
   return data;
 }
 
-// OAuth is a full-page redirect flow, not an API call: the browser
-// navigates to the backend, which redirects to Google/GitHub, which
-// redirects back to the backend, which redirects to /auth/callback on
-// the frontend with a token in the query string. We pass the current
-// device id along so any anonymous uploads/dashboards on this browser
-// get claimed by the resulting account (see claim_device_data on the
-// backend).
+// Helper to resolve absolute API URL for full-page OAuth redirects
+const isProduction = import.meta.env.PROD;
+const rawApiBase = (import.meta.env.VITE_API_URL as string) || (isProduction ? "" : "/api");
+
+function getOAuthBaseUrl(): string {
+  const cleaned = rawApiBase.endsWith("/") ? rawApiBase.slice(0, -1) : rawApiBase;
+  if (cleaned.endsWith("/api")) {
+    return cleaned;
+  }
+  return `${cleaned}/api`;
+}
+
 export function googleLoginUrl(): string {
-  return `/api/auth/google/login?device_id=${encodeURIComponent(getDeviceId())}`;
+  const base = getOAuthBaseUrl();
+  return `${base}/auth/google/login?device_id=${encodeURIComponent(getDeviceId())}`;
 }
 
 export function githubLoginUrl(): string {
-  return `/api/auth/github/login?device_id=${encodeURIComponent(getDeviceId())}`;
+  const base = getOAuthBaseUrl();
+  return `${base}/auth/github/login?device_id=${encodeURIComponent(getDeviceId())}`;
 }
