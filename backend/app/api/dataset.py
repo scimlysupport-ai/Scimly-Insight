@@ -42,9 +42,12 @@ def get_processing_progress(file_id: int, db: Session = Depends(get_db)):
     if not file_record:
         raise HTTPException(status_code=404, detail="File not found.")
 
-    live = get_progress(file_id)
-    if live is not None:
-        return ProcessingProgressResponse(**live)
+    try:
+        live = get_progress(file_id)
+        if live is not None:
+            return ProcessingProgressResponse(**live)
+    except Exception:
+        pass
 
     if file_record.status == "ready":
         return ProcessingProgressResponse(status="ready", progress=100, message="Analysis complete.")
