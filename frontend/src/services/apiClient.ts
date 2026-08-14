@@ -3,8 +3,9 @@ import { getDeviceId } from "./deviceId";
 import { useAuthStore } from "../store/useAuthStore";
 
 // Use environment variable in production, fallback to local dev proxy /api
-const isProduction = import.meta.env.PROD;
-const apiBase = import.meta.env.VITE_API_URL || (isProduction ? "" : "/api");
+const env = (import.meta as any).env || {};
+const isProduction = env.PROD;
+const apiBase = env.VITE_API_URL || (isProduction ? "" : "/api");
 
 // All backend calls go through this single client.
 export const apiClient = axios.create({

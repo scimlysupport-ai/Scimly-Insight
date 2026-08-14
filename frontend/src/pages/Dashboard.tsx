@@ -328,7 +328,7 @@ export default function Dashboard() {
       const override = overrides?.[widgetId];
       const isTypeChanged = override?.chart !== undefined && override.chart !== widget.chart;
 
-      if (isTypeChanged) {
+      if (isTypeChanged && override?.chart) {
         return {
           chart: override.chart,
           title: override.title ?? widget.title,
@@ -337,7 +337,7 @@ export default function Dashboard() {
           y: override.y,
           columns: override.columns,
           color: override.color,
-        };
+        } as SavedWidget;
       }
 
       return {
@@ -347,7 +347,7 @@ export default function Dashboard() {
         x: override?.x ?? widget.x,
         y: override?.y ?? widget.y,
         columns: override?.columns ?? widget.columns,
-        color: override?.color ?? widget.color,
+        color: override?.color ?? (widget as any).color,
 
         important: widget.important,
         agg: override?.y === undefined ? (override?.column === undefined ? widget.agg : undefined) : undefined,
@@ -359,7 +359,7 @@ export default function Dashboard() {
         rate_value: widget.rate_value,
         count_kpi: (override?.column !== undefined && override.column !== widget.column) ? false : widget.count_kpi,
         sort_by: widget.sort_by,
-      };
+      } as SavedWidget;
     });
   }
 

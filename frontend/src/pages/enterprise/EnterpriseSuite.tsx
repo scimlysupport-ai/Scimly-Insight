@@ -120,7 +120,6 @@ export default function EnterpriseSuite() {
 
   // Mutations
   const createTeamMutation = useMutation({
-    group: "enterprise",
     mutationFn: () => createTeam(teamName, teamDescription),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["enterprise-teams"] });
@@ -131,7 +130,6 @@ export default function EnterpriseSuite() {
   });
 
   const createShareMutation = useMutation({
-    group: "enterprise",
     mutationFn: () => {
       const payload: Record<string, any> = {
         dashboard_id: Number(dashboardId),
@@ -151,14 +149,12 @@ export default function EnterpriseSuite() {
   });
 
   const createScheduleMutation = useMutation({
-    group: "enterprise",
     mutationFn: () =>
       createSchedule({ dashboard_id: Number(dashboardId), cron_expression: scheduleCron, enabled: true }),
     onSuccess: () => alert("Refresh schedule created successfully"),
   });
 
   const createAlertMutation = useMutation({
-    group: "enterprise",
     mutationFn: () =>
       createAlert({
         dashboard_id: Number(dashboardId),
@@ -171,7 +167,6 @@ export default function EnterpriseSuite() {
   });
 
   const createSnapshotMutation = useMutation({
-    group: "enterprise",
     mutationFn: () => createVersionSnapshot(Number(dashboardId), versionLabel),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["enterprise-version-history", dashboardId] });
@@ -181,7 +176,6 @@ export default function EnterpriseSuite() {
   });
 
   const addMemberMutation = useMutation({
-    group: "enterprise",
     mutationFn: () => addTeamMember(Number(memberTeamId), Number(memberUserId), memberRole),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["enterprise-team-members", memberTeamId] });
