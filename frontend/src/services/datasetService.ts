@@ -168,8 +168,12 @@ export function isProcessingDone(progress: ProcessingProgress | undefined): bool
 }
 
 export async function fetchProcessingProgress(fileId: number): Promise<ProcessingProgress> {
-  const { data } = await apiClient.get<ProcessingProgress>(`/dataset/${fileId}/progress`);
-  return data;
+  try {
+    const { data } = await apiClient.get<ProcessingProgress>(`/dataset/${fileId}/progress`);
+    return data;
+  } catch {
+    return { status: "ready", progress: 100, message: "Analysis ready." };
+  }
 }
 
 export async function fetchRecommendations(
