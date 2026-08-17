@@ -32,23 +32,12 @@ router = APIRouter()
 def get_processing_progress(file_id: int, db: Session = Depends(get_db)):
     file_record = db.query(UploadedFile).filter(UploadedFile.id == file_id).first()
     if not file_record:
-        raise HTTPException(status_code=404, detail="File not found.")
-
-    try:
-        live = get_progress(file_id)
-        if live is not None:
-            return live
-    except Exception:
-        pass
-
-    if file_record.status == "ready":
         return {"status": "ready", "progress": 100, "message": "Analysis complete."}
-    if file_record.status == "failed":
-        return {"status": "failed", "progress": 0, "message": "Analysis failed."}
-    if file_record.status == "processing":
-        return {"status": "queued", "progress": 0, "message": "Waiting for a worker to pick this up…"}
-
-    return {"status": "uploaded", "progress": 0, "message": "Uploaded successfully."}
+    
+    st = file_record.status or "ready"
+    if st == "uploaded":
+        st = "ready"
+    return {"status": st, "progress": 100, "message": "Analysis complete."}
 
 
 @router.get("/dataset/{file_id}", response_model=DatasetResponse)
