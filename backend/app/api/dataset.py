@@ -30,32 +30,25 @@ router = APIRouter()
 
 @router.get("/dataset/{file_id}/progress", response_model=ProcessingProgressResponse)
 def get_processing_progress(file_id: int, db: Session = Depends(get_db)):
+    file_record = db.query(UploadedFile).filter(UploadedFile.id == file_id).first()
+    if not file_record:
+        raise HTTPException(status_code=404, detail="File not found.")
+
     try:
-        file_record = db.query(UploadedFile).filter(UploadedFile.id == file_id).first()
-        if not file_record:
-            raise HTTPException(status_code=404, detail="File not found.")
+        live = get_progress(file_id)
+        if live is not None:
+            return live
+    except Exception:
+        pass
 
-        try:
-            live = get_progress(file_id)
-            if live is not None:
-                return ProcessingProgressResponse(**live)
-        except Exception:
-            pass
+    if file_record.status == "ready":
+        return {"status": "ready", "progress": 100, "message": "Analysis complete."}
+    if file_record.status == "failed":
+        return {"status": "failed", "progress": 0, "message": "Analysis failed."}
+    if file_record.status == "processing":
+        return {"status": "queued", "progress": 0, "message": "Waiting for a worker to pick this up…"}
 
-        if file_record.status == "ready":
-            return ProcessingProgressResponse(status="ready", progress=100, message="Analysis complete.")
-        if file_record.status == "failed":
-            return ProcessingProgressResponse(status="failed", progress=0, message="Analysis failed.")
-        if file_record.status == "processing":
-            return ProcessingProgressResponse(status="queued", progress=0, message="Waiting for a worker to pick this up…")
-
-        return ProcessingProgressResponse(status="uploaded", progress=0, message=None)
-    except HTTPException:
-        raise
-    except Exception as exc:
-        import logging
-        logging.getLogger(__name__).exception("Error in get_processing_progress for file %s", file_id)
-        raise HTTPException(status_code=500, detail=f"Progress error: {exc}")
+    return {"status": "uploaded", "progress": 0, "message": "Uploaded successfully."}
 
 
 @router.get("/dataset/{file_id}", response_model=DatasetResponse)
