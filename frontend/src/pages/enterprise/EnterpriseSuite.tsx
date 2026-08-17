@@ -502,13 +502,21 @@ export default function EnterpriseSuite() {
                             <span className="font-medium text-white truncate block">{item.name || `Dashboard #${item.dashboard_id}`}</span>
                             <span className="text-[10px] text-scimly-muted">Via: {item.shared_via}</span>
                           </div>
-                          <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${
-                            item.permission === "edit"
-                              ? "bg-scimly-primary/10 text-scimly-primary border border-scimly-primary/20"
-                              : "bg-scimly-accent/10 text-scimly-accent border border-scimly-accent/20"
-                          }`}>
-                            {item.permission}
-                          </span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${
+                              item.permission === "edit"
+                                ? "bg-scimly-primary/10 text-scimly-primary border border-scimly-primary/20"
+                                : "bg-scimly-accent/10 text-scimly-accent border border-scimly-accent/20"
+                            }`}>
+                              {item.permission}
+                            </span>
+                            <Link
+                              to={`/dashboard?fileId=${item.file_id}&savedId=${item.id}`}
+                              className="bg-scimly-primary/20 hover:bg-scimly-primary/30 text-scimly-primary border border-scimly-primary/40 text-[10px] font-bold uppercase px-2.5 py-1 rounded transition-colors"
+                            >
+                              Open ↗
+                            </Link>
+                          </div>
                         </li>
                       ))}
                     </ul>
