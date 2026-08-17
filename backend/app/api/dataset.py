@@ -28,7 +28,7 @@ import os
 router = APIRouter()
 
 
-@router.get("/dataset/{file_id}/progress", response_model=ProcessingProgressResponse)
+@router.get("/dataset/{file_id}/progress")
 def get_processing_progress(file_id: int, db: Session = Depends(get_db)):
     file_record = db.query(UploadedFile).filter(UploadedFile.id == file_id).first()
     if not file_record:
