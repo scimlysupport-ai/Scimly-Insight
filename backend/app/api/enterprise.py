@@ -116,14 +116,18 @@ def create_team(payload: TeamCreateRequest, db: Session = Depends(get_db), user:
 
 @router.post("/teams/{team_id}/members")
 def add_team_member(team_id: int, payload: TeamMemberRequest, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    team = db.query(Team).filter(Team.id == team_id, Team.owner_id == user.id).first()
+    team = db.query(Team).filter(Team.id == team_id).first()
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
 
+    is_member = db.query(TeamMember).filter(TeamMember.team_id == team_id, TeamMember.user_id == user.id).first()
+    if team.owner_id != user.id and not is_member:
+        raise HTTPException(status_code=403, detail="You do not have permission to manage this team.")
+
     invitee = None
-    if payload.user_id:
+    if payload.user_id is not None:
         invitee = db.query(User).filter(User.id == payload.user_id).first()
-    elif payload.email:
+    elif payload.email and payload.email.strip():
         clean_email = payload.email.strip().lower()
         invitee = db.query(User).filter(User.email == clean_email).first()
         if not invitee:
@@ -142,7 +146,7 @@ def add_team_member(team_id: int, payload: TeamMemberRequest, db: Session = Depe
     if existing:
         raise HTTPException(status_code=409, detail=f"{invitee.email or invitee.name} is already a member of this team.")
 
-    member = TeamMember(team_id=team_id, user_id=invitee.id, role=payload.role)
+    member = TeamMember(team_id=team_id, user_id=invitee.id, role=payload.role.lower())
     db.add(member)
     log_audit_event(db, user, "team_member", team_id, "added_member", {"user_id": invitee.id, "email": invitee.email, "role": payload.role})
     db.commit()
@@ -180,9 +184,13 @@ def list_team_members(team_id: int, db: Session = Depends(get_db), user: User = 
 
 @router.delete("/teams/{team_id}/members/{member_user_id}")
 def remove_team_member(team_id: int, member_user_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    team = db.query(Team).filter(Team.id == team_id, Team.owner_id == user.id).first()
+    team = db.query(Team).filter(Team.id == team_id).first()
     if not team:
-        raise HTTPException(status_code=404, detail="Team not found or access denied")
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    is_member = db.query(TeamMember).filter(TeamMember.team_id == team_id, TeamMember.user_id == user.id).first()
+    if team.owner_id != user.id and not is_member:
+        raise HTTPException(status_code=403, detail="You do not have permission to manage this team.")
 
     member = db.query(TeamMember).filter(TeamMember.team_id == team_id, TeamMember.user_id == member_user_id).first()
     if not member:
