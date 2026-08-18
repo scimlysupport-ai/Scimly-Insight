@@ -180,15 +180,26 @@ export default function EnterpriseSuite() {
 
   const addMemberMutation = useMutation({
     mutationFn: () => {
+      if (!memberTeamId || memberTeamId === "") {
+        throw new Error("Please select or create a team first.");
+      }
+      if (inviteMode === "email" && !inviteEmail.trim()) {
+        throw new Error("Please enter a valid email address.");
+      }
       if (inviteMode === "email") {
-        return addTeamMember(Number(memberTeamId), undefined, memberRole, inviteEmail);
+        return addTeamMember(Number(memberTeamId), undefined, memberRole, inviteEmail.trim());
       }
       return addTeamMember(Number(memberTeamId), Number(memberUserId), memberRole);
     },
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ["enterprise-team-members", memberTeamId] });
       setInviteEmail("");
-      alert("Teammate invited successfully!");
+      const successMsg = res?.data?.message || "Teammate invited successfully!";
+      alert(successMsg);
+    },
+    onError: (err: any) => {
+      const detail = err?.response?.data?.detail || err?.message || "Failed to invite teammate.";
+      alert(`Invitation error: ${detail}`);
     },
   });
 
