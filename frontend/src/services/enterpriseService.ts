@@ -35,6 +35,10 @@ export async function addTeamMember(teamId: number, userId?: number, role: strin
   return apiClient.post(`/enterprise/teams/${teamId}/members`, { user_id: userId, role, email });
 }
 
+export async function removeTeamMember(teamId: number, memberUserId: number) {
+  return apiClient.delete(`/enterprise/teams/${teamId}/members/${memberUserId}`);
+}
+
 export async function createSchedule(payload: Record<string, unknown>) {
   return apiClient.post("/enterprise/schedules", payload);
 }

@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { listSavedDashboards } from "../../services/dashboardService";
 import {
   addTeamMember,
+  removeTeamMember,
   createAlert,
   createSchedule,
   createShare,
@@ -198,8 +199,32 @@ export default function EnterpriseSuite() {
       alert(successMsg);
     },
     onError: (err: any) => {
-      const detail = err?.response?.data?.detail || err?.message || "Failed to invite teammate.";
-      alert(`Invitation error: ${detail}`);
+      let msg = "Failed to invite teammate.";
+      if (err?.response?.data?.detail) {
+        const d = err.response.data.detail;
+        msg = typeof d === "string" ? d : Array.isArray(d) ? d.map((i: any) => i.msg || JSON.stringify(i)).join(", ") : JSON.stringify(d);
+      } else if (err?.message) {
+        msg = err.message;
+      }
+      alert(`Invitation error: ${msg}`);
+    },
+  });
+
+  const removeMemberMutation = useMutation({
+    mutationFn: (targetUserId: number) => removeTeamMember(Number(memberTeamId), targetUserId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["enterprise-team-members", memberTeamId] });
+      alert("Team member removed successfully!");
+    },
+    onError: (err: any) => {
+      let msg = "Failed to remove member.";
+      if (err?.response?.data?.detail) {
+        const d = err.response.data.detail;
+        msg = typeof d === "string" ? d : Array.isArray(d) ? d.map((i: any) => i.msg || JSON.stringify(i)).join(", ") : JSON.stringify(d);
+      } else if (err?.message) {
+        msg = err.message;
+      }
+      alert(`Error: ${msg}`);
     },
   });
 
@@ -447,14 +472,27 @@ export default function EnterpriseSuite() {
                       ) : (
                         <ul className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
                           {teamMembers.map((m) => (
-                            <li key={m.id} className="text-xs bg-scimly-bg/50 border border-scimly-border rounded-lg px-3 py-2 flex items-center justify-between">
+                            <li key={m.id} className="text-xs bg-scimly-bg/50 border border-scimly-border rounded-lg px-3 py-2 flex items-center justify-between gap-2">
                               <div className="min-w-0">
                                 <span className="font-medium text-white block truncate">{m.name}</span>
                                 <span className="text-[10px] text-scimly-muted block truncate">{m.email}</span>
                               </div>
-                              <span className="text-[10px] font-semibold bg-scimly-primary/10 text-scimly-primary border border-scimly-primary/20 px-2 py-0.5 rounded uppercase">
-                                {m.role}
-                              </span>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="text-[10px] font-semibold bg-scimly-primary/10 text-scimly-primary border border-scimly-primary/20 px-2 py-0.5 rounded uppercase">
+                                  {m.role}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (confirm(`Remove ${m.name || m.email} from team?`)) {
+                                      removeMemberMutation.mutate(m.user_id);
+                                    }
+                                  }}
+                                  className="text-[10px] font-semibold text-red-400 hover:text-red-300 border border-red-500/20 hover:border-red-500/40 bg-red-500/10 px-2 py-0.5 rounded transition-colors"
+                                >
+                                  Remove
+                                </button>
+                              </div>
                             </li>
                           ))}
                         </ul>

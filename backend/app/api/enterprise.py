@@ -178,6 +178,22 @@ def list_team_members(team_id: int, db: Session = Depends(get_db), user: User = 
     ]
 
 
+@router.delete("/teams/{team_id}/members/{member_user_id}")
+def remove_team_member(team_id: int, member_user_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    team = db.query(Team).filter(Team.id == team_id, Team.owner_id == user.id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found or access denied")
+
+    member = db.query(TeamMember).filter(TeamMember.team_id == team_id, TeamMember.user_id == member_user_id).first()
+    if not member:
+        raise HTTPException(status_code=404, detail="Team member not found")
+
+    db.delete(member)
+    log_audit_event(db, user, "team_member", team_id, "removed_member", {"user_id": member_user_id})
+    db.commit()
+    return {"ok": True, "message": "Team member removed successfully"}
+
+
 @router.post("/shares")
 def create_share(payload: ShareRequest, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     _owned_dashboard(db, payload.dashboard_id, user)
