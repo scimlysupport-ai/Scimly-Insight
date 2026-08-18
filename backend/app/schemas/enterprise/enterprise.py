@@ -15,9 +15,9 @@ class TeamResponse(BaseModel):
 
 
 class TeamMemberRequest(BaseModel):
-    user_id: Union[int, None] = None
-    email: Union[str, None] = None
-    role: str = "member"
+    user_id: int | None = Field(default=None)
+    email: str | None = Field(default=None)
+    role: str = Field(default="member")
 
 
 class ShareRequest(BaseModel):
