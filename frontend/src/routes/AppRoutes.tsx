@@ -21,6 +21,7 @@ export default function AppRoutes() {
       <Route path="/dashboard/:fileId" element={<Dashboard />} />
       {/* Phase 10 — opening a saved snapshot instead of the auto-generated dashboard */}
       <Route path="/dashboard/:fileId/saved/:savedId" element={<Dashboard />} />
+      <Route path="/dashboard/:fileId/:savedId" element={<Dashboard />} />
       {/* Phase 12 — Authentication */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />

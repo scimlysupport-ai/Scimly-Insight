@@ -511,7 +511,7 @@ export default function EnterpriseSuite() {
                               {item.permission}
                             </span>
                             <Link
-                              to={`/dashboard/${item.file_id}/${item.id}`}
+                              to={`/dashboard/${item.file_id}/saved/${item.id}`}
                               className="bg-scimly-primary/20 hover:bg-scimly-primary/30 text-scimly-primary border border-scimly-primary/40 text-[10px] font-bold uppercase px-2.5 py-1 rounded transition-colors"
                             >
                               Open ↗
