@@ -62,6 +62,18 @@ def decode_access_token(token: str) -> int | None:
 # ---------------------------------------------------------------------------
 
 def register_user(db: Session, email: str, password: str, name: str | None) -> User:
+    existing = db.query(User).filter(User.email == email).first()
+    if existing:
+        if existing.password_hash is not None:
+            raise ValueError("Account already exists with this email.")
+        existing.password_hash = hash_password(password)
+        if name:
+            existing.name = name
+        existing.auth_provider = "email"
+        db.commit()
+        db.refresh(existing)
+        return existing
+
     user = User(
         email=email,
         password_hash=hash_password(password),

@@ -104,19 +104,33 @@ def add_team_member(team_id: int, payload: TeamMemberRequest, db: Session = Depe
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
 
-    invitee = db.query(User).filter(User.id == payload.user_id).first()
+    invitee = None
+    if payload.user_id:
+        invitee = db.query(User).filter(User.id == payload.user_id).first()
+    elif payload.email:
+        clean_email = payload.email.strip().lower()
+        invitee = db.query(User).filter(User.email == clean_email).first()
+        if not invitee:
+            invitee = User(
+                email=clean_email,
+                name=clean_email.split("@")[0],
+                auth_provider="invited"
+            )
+            db.add(invitee)
+            db.flush()
+
     if not invitee:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=400, detail="Please specify a valid teammate or email address.")
 
-    existing = db.query(TeamMember).filter(TeamMember.team_id == team_id, TeamMember.user_id == payload.user_id).first()
+    existing = db.query(TeamMember).filter(TeamMember.team_id == team_id, TeamMember.user_id == invitee.id).first()
     if existing:
-        raise HTTPException(status_code=409, detail="User is already a member of this team")
+        raise HTTPException(status_code=409, detail=f"{invitee.email or invitee.name} is already a member of this team.")
 
-    member = TeamMember(team_id=team_id, user_id=payload.user_id, role=payload.role)
+    member = TeamMember(team_id=team_id, user_id=invitee.id, role=payload.role)
     db.add(member)
-    log_audit_event(db, user, "team_member", team_id, "added_member", {"user_id": payload.user_id, "role": payload.role})
+    log_audit_event(db, user, "team_member", team_id, "added_member", {"user_id": invitee.id, "email": invitee.email, "role": payload.role})
     db.commit()
-    return {"ok": True}
+    return {"ok": True, "message": f"Successfully invited {invitee.email or invitee.name}"}
 
 
 @router.get("/teams/{team_id}/members")

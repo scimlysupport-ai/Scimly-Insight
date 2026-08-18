@@ -175,11 +175,20 @@ export default function EnterpriseSuite() {
     },
   });
 
+  const [inviteMode, setInviteMode] = useState<"email" | "user">("email");
+  const [inviteEmail, setInviteEmail] = useState("");
+
   const addMemberMutation = useMutation({
-    mutationFn: () => addTeamMember(Number(memberTeamId), Number(memberUserId), memberRole),
+    mutationFn: () => {
+      if (inviteMode === "email") {
+        return addTeamMember(Number(memberTeamId), undefined, memberRole, inviteEmail);
+      }
+      return addTeamMember(Number(memberTeamId), Number(memberUserId), memberRole);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["enterprise-team-members", memberTeamId] });
-      alert("Team member added successfully");
+      setInviteEmail("");
+      alert("Teammate invited successfully!");
     },
   });
 
@@ -346,20 +355,58 @@ export default function EnterpriseSuite() {
                       </select>
                     </div>
 
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-semibold text-scimly-muted uppercase tracking-wider">Select User</label>
-                      <select
-                        className="w-full bg-scimly-bg border border-scimly-border rounded-xl px-3 py-2 text-sm text-scimly-text focus:border-scimly-primary outline-none transition-colors"
-                        value={memberUserId}
-                        onChange={(e) => setMemberUserId(e.target.value)}
+                    <div className="flex gap-2 p-1 bg-scimly-bg border border-scimly-border rounded-xl mb-2">
+                      <button
+                        type="button"
+                        onClick={() => setInviteMode("email")}
+                        className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                          inviteMode === "email"
+                            ? "bg-scimly-primary text-white font-semibold"
+                            : "text-scimly-muted hover:text-scimly-text"
+                        }`}
                       >
-                        {users.length === 0 ? (
-                          <option disabled value="">No users available</option>
-                        ) : (
-                          users.map((u) => <option key={u.id} value={u.id}>{u.name || u.email}</option>)
-                        )}
-                      </select>
+                        Invite by Email
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setInviteMode("user")}
+                        className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                          inviteMode === "user"
+                            ? "bg-scimly-primary text-white font-semibold"
+                            : "text-scimly-muted hover:text-scimly-text"
+                        }`}
+                      >
+                        Select Teammate
+                      </button>
                     </div>
+
+                    {inviteMode === "email" ? (
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-semibold text-scimly-muted uppercase tracking-wider">Teammate Email Address</label>
+                        <input
+                          type="email"
+                          placeholder="e.g. colleague@company.com"
+                          className="w-full bg-scimly-bg border border-scimly-border rounded-xl px-3 py-2 text-sm text-scimly-text focus:border-scimly-primary outline-none transition-colors"
+                          value={inviteEmail}
+                          onChange={(e) => setInviteEmail(e.target.value)}
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-semibold text-scimly-muted uppercase tracking-wider">Select User</label>
+                        <select
+                          className="w-full bg-scimly-bg border border-scimly-border rounded-xl px-3 py-2 text-sm text-scimly-text focus:border-scimly-primary outline-none transition-colors"
+                          value={memberUserId}
+                          onChange={(e) => setMemberUserId(e.target.value)}
+                        >
+                          {users.length === 0 ? (
+                            <option disabled value="">No users available</option>
+                          ) : (
+                            users.map((u) => <option key={u.id} value={u.id}>{u.name || u.email}</option>)
+                          )}
+                        </select>
+                      </div>
+                    )}
 
                     <div className="flex flex-col gap-1.5">
                       <label className="text-[10px] font-semibold text-scimly-muted uppercase tracking-wider">Select Role</label>
@@ -376,10 +423,10 @@ export default function EnterpriseSuite() {
 
                     <button
                       onClick={() => addMemberMutation.mutate()}
-                      disabled={teams.length === 0 || users.length === 0}
+                      disabled={teams.length === 0 || (inviteMode === "email" ? !inviteEmail.trim() : users.length === 0)}
                       className="bg-gradient-to-r from-scimly-primary to-blue-600 text-white font-semibold text-xs px-4 py-2.5 rounded-xl hover:scale-[1.01] active:scale-[0.99] transition-all disabled:opacity-50 disabled:pointer-events-none mb-4"
                     >
-                      Add Member
+                      {inviteMode === "email" ? "Invite Teammate" : "Add Member"}
                     </button>
 
                     <div className="pt-4 border-t border-scimly-border/50">

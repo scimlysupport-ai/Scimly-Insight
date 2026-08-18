@@ -45,10 +45,14 @@ def register(
     x_device_id: str | None = Header(default=None, alias="X-Device-Id"),
     db: Session = Depends(get_db),
 ):
-    if db.query(User).filter(User.email == payload.email).first():
+    existing = db.query(User).filter(User.email == payload.email).first()
+    if existing and existing.password_hash is not None:
         raise HTTPException(status_code=409, detail="An account with this email already exists.")
 
-    user = register_user(db, payload.email, payload.password, payload.name)
+    try:
+        user = register_user(db, payload.email, payload.password, payload.name)
+    except ValueError as err:
+        raise HTTPException(status_code=409, detail=str(err))
     claim_device_data(db, user, x_device_id)
 
     return TokenResponse(access_token=create_access_token(user.id), user=UserResponse.model_validate(user))

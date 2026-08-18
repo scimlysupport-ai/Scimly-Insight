@@ -31,8 +31,8 @@ export async function createShare(payload: Record<string, unknown>) {
   return apiClient.post("/enterprise/shares", payload);
 }
 
-export async function addTeamMember(teamId: number, userId: number, role: string) {
-  return apiClient.post(`/enterprise/teams/${teamId}/members`, { user_id: userId, role });
+export async function addTeamMember(teamId: number, userId?: number, role: string = "member", email?: string) {
+  return apiClient.post(`/enterprise/teams/${teamId}/members`, { user_id: userId, role, email });
 }
 
 export async function createSchedule(payload: Record<string, unknown>) {
