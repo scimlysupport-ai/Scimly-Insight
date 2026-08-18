@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
@@ -41,10 +41,15 @@ interface InteractionState {
 }
 
 export default function Dashboard() {
-  const { fileId, savedId } = useParams<{ fileId: string; savedId?: string }>();
+  const { fileId, savedId } = useParams<{ fileId?: string; savedId?: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const id = Number(fileId);
+
+  const paramFileId = fileId || searchParams.get("fileId") || "";
+  const paramSavedId = savedId || searchParams.get("savedId") || "";
+
+  const id = Number(paramFileId);
   const fileKey = String(id);
 
   // Phase 10 — opening a saved snapshot instead of the auto-generated
@@ -52,7 +57,7 @@ export default function Dashboard() {
   // and which key their layout/edits are stored under (so two saved
   // dashboards on the same file never collide with each other or with
   // the unsaved auto dashboard).
-  const savedIdNum = savedId ? Number(savedId) : NaN;
+  const savedIdNum = paramSavedId ? Number(paramSavedId) : NaN;
   const isSavedMode = !Number.isNaN(savedIdNum);
   const dashboardKey = isSavedMode ? `saved-${savedIdNum}` : fileKey;
 
