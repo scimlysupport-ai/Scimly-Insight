@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Union
 
 
 class TeamCreateRequest(BaseModel):
@@ -15,8 +15,8 @@ class TeamResponse(BaseModel):
 
 
 class TeamMemberRequest(BaseModel):
-    user_id: Optional[int] = Field(default=None)
-    email: Optional[str] = Field(default=None)
+    user_id: Union[int, None] = None
+    email: Union[str, None] = None
     role: str = "member"
 
 

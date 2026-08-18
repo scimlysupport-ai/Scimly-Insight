@@ -33,7 +33,7 @@ except urllib.error.HTTPError as e:
     print("USING EXISTING TEAM:", team_id)
 
 # Test invite by email
-invite_payload = json.dumps({"email": "newteammate@company.com", "role": "member"}).encode()
+invite_payload = json.dumps({"user_id": None, "email": "newteammate@company.com", "role": "member"}).encode()
 inv_req = urllib.request.Request(f"{base_url}/enterprise/teams/{team_id}/members", data=invite_payload, headers=headers)
 try:
     inv_res = urllib.request.urlopen(inv_req)
