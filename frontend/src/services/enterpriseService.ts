@@ -32,9 +32,11 @@ export async function createShare(payload: Record<string, unknown>) {
 }
 
 export async function addTeamMember(teamId: number, userId?: number, role: string = "member", email?: string) {
-  const payload: Record<string, any> = { role: role.toLowerCase() };
-  if (userId !== undefined && userId !== null) payload.user_id = userId;
-  if (email !== undefined && email !== null && email.trim() !== "") payload.email = email.trim();
+  const payload: Record<string, any> = {
+    user_id: userId !== undefined && userId !== null ? userId : null,
+    email: email !== undefined && email !== null && email.trim() !== "" ? email.trim() : null,
+    role: role.toLowerCase(),
+  };
   return apiClient.post(`/enterprise/teams/${teamId}/members`, payload);
 }
 
