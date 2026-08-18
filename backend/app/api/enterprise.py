@@ -76,14 +76,30 @@ def list_teams(db: Session = Depends(get_db), user: User = Depends(get_current_u
 
 @router.get("/users")
 def list_users(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    # Deliberately doesn't return email: this powers a "pick a teammate"
-    # dropdown, not a directory. Returning every user's email to any
-    # authenticated account is an account-enumeration leak with no
-    # feature benefit -- a name is enough to pick the right person from
-    # a short list. Capped, too, so this doesn't become an unbounded
-    # full-table dump as the user base grows.
-    users = db.query(User).filter(User.id != user.id).limit(200).all()
-    return [{"id": person.id, "name": person.name or f"User {person.id}"} for person in users]
+    domain = None
+    if user.email and "@" in user.email:
+        d = user.email.split("@")[1].lower()
+        public_providers = ("gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "icloud.com", "protonmail.com", "aol.com")
+        if d not in public_providers:
+            domain = d
+
+    my_team_ids = [row[0] for row in db.query(TeamMember.team_id).filter(TeamMember.user_id == user.id).all()]
+    my_teammate_ids = [row[0] for row in db.query(TeamMember.user_id).filter(TeamMember.team_id.in_(my_team_ids)).all()] if my_team_ids else []
+
+    filters = [User.id != user.id]
+    if domain:
+        domain_filter = User.email.ilike(f"%@{domain}")
+        if my_teammate_ids:
+            filters.append(or_(domain_filter, User.id.in_(my_teammate_ids)))
+        else:
+            filters.append(domain_filter)
+    elif my_teammate_ids:
+        filters.append(User.id.in_(my_teammate_ids))
+    else:
+        return []
+
+    users = db.query(User).filter(*filters).limit(200).all()
+    return [{"id": person.id, "name": person.name or person.email or f"User {person.id}", "email": person.email} for person in users]
 
 
 @router.post("/teams", response_model=TeamResponse)
