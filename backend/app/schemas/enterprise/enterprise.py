@@ -15,7 +15,7 @@ class TeamResponse(BaseModel):
 
 
 class TeamMemberRequest(BaseModel):
-    user_id: int = 0
+    user_id: Optional[int] = None
     email: Optional[str] = None
     role: str = "member"
 

@@ -125,7 +125,7 @@ def add_team_member(team_id: int, payload: TeamMemberRequest, db: Session = Depe
         raise HTTPException(status_code=403, detail="You do not have permission to manage this team.")
 
     invitee = None
-    if payload.user_id and payload.user_id > 0:
+    if payload.user_id:
         invitee = db.query(User).filter(User.id == payload.user_id).first()
     elif payload.email and payload.email.strip():
         clean_email = payload.email.strip().lower()
